@@ -14,6 +14,7 @@ import streamlit as st
 from modules.analytics import describe_correlation, pearson
 from modules.ui import banner, empty_state, filter_performance, open_records, prepare_page, show_chart
 from modules.visualization import (
+    attendance_bands_chart,
     attendance_scatter,
     correlation_heatmap,
     internal_final_scatter,
@@ -41,7 +42,21 @@ if "attendance_percentage" not in view.columns:
 else:
     attendance_r, attendance_n = pearson(view, "attendance_percentage", "subject_percentage")
     st.write(describe_correlation(attendance_r, attendance_n, "attendance", "subject percentage"))
-    show_chart(attendance_scatter(view), "Attendance and subject percentage need at least two complete pairs.")
+    left, right = st.columns(2)
+    with left:
+        show_chart(
+            attendance_scatter(view),
+            "Attendance and subject percentage need at least two complete pairs.",
+        )
+    with right:
+        show_chart(
+            attendance_bands_chart(view, threshold=settings["attendance_threshold"]),
+            "No attendance values to group into bands.",
+        )
+        st.caption(
+            f"Bands use the sidebar review threshold ({settings['attendance_threshold']:.0f}%) "
+            "and a high band from 85% upward."
+        )
 
 if "study_hours" not in view.columns:
     st.warning("Study hours are not in this dataset, so that chart is unavailable.")

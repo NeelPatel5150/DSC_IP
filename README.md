@@ -123,7 +123,7 @@ Reset during development: stop the app, delete `database/app.db`, and start agai
 
 ## Dataset
 
-`data/sample_students.csv` has 100 generated rows. The first line says the file is synthetic. Regenerate it with:
+`data/sample_students.csv` has 180 generated rows across Semester 1–8 (random counts per semester). The first line says the file is synthetic. Regenerate it with:
 
 ```powershell
 .\.venv\Scripts\python.exe -m data.generate_sample
@@ -133,7 +133,7 @@ That command rewrites the CSV only. It does not change the database.
 
 Columns: `student_id`, `student_name`, `semester`, `department`, `attendance_percentage`, `study_hours`, `mathematics_marks`, `programming_marks`, `database_marks`, `internal_marks`, `final_marks`.
 
-Departments are Computer Science, Information Technology, and Data Science. Semesters are Semester 5, Semester 6, and Semester 7. A few rows are fixed so a demonstration can show a high scorer (`S001`), a fail (`S040`), a missing mathematics mark (`S097`), an incomplete record (`S098`), a genuine zero (`S099`), and attendance of 74% (`S100`).
+Departments are Computer Science, Information Technology, and Data Science. Semesters run from Semester 1 through Semester 8. A few rows are fixed so a demonstration can show a high scorer (`S001`), a fail (`S040`), a missing mathematics mark (`S097`), an incomplete record (`S098`), a genuine zero (`S099`), and attendance of 74% (`S100`).
 
 ## Grading rules
 

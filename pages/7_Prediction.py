@@ -14,7 +14,11 @@ import streamlit as st
 
 from modules.config import MIN_PREDICTION_ROWS, PREDICTION_FEATURES, PREDICTION_TARGET
 from modules.prediction import train_final_mark_model
-from modules.ui import banner, empty_state, loading, open_records, prepare_page
+from modules.ui import banner, empty_state, loading, open_records, prepare_page, show_chart
+from modules.visualization import (
+    prediction_actual_vs_estimated_scatter,
+    prediction_residual_histogram,
+)
 
 settings = prepare_page()
 banner(
@@ -88,6 +92,23 @@ st.caption(
     "so MAE against the baseline is the comparison that matters here. "
     "The baseline predicts the training-set average for every test student."
 )
+
+st.subheader("Test-set charts")
+st.caption(
+    "Points near the dashed line are close estimates. "
+    "Residuals near zero mean the estimate matched the stored final mark."
+)
+left, right = st.columns(2)
+with left:
+    show_chart(
+        prediction_actual_vs_estimated_scatter(outcome.comparison),
+        "No test-set pairs to plot actual against estimated marks.",
+    )
+with right:
+    show_chart(
+        prediction_residual_histogram(outcome.comparison),
+        "No residuals to plot for this test split.",
+    )
 
 st.subheader("Test-set estimates")
 st.caption(

@@ -31,7 +31,6 @@ navigation = st.navigation(
         st.Page("pages/5_Student_Reports.py", title="Individual Reports"),
         st.Page("pages/6_Risk_Identification.py", title="Risk Identification"),
         st.Page("pages/7_Prediction.py", title="Prediction"),
-        st.Page("pages/8_About_Project.py", title="About Project"),
     ]
 )
 navigation.run()

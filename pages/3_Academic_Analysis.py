@@ -14,11 +14,16 @@ import streamlit as st
 from modules.analytics import subject_summary
 from modules.ui import banner, display_table, empty_state, filter_performance, loading, open_records, prepare_page, show_chart
 from modules.visualization import (
+    department_semester_result_sunburst,
     grade_donut,
+    grades_by_semester_stacked,
     pass_fail_chart,
     percentage_histogram,
+    semester_pass_rate_chart,
     student_comparison_chart,
     subject_average_chart,
+    subject_percentage_box_by_semester,
+    top_bottom_subject_percentage_chart,
 )
 
 settings = prepare_page()
@@ -60,6 +65,44 @@ with left:
     show_chart(percentage_histogram(view), "No subject percentages to plot.")
 with right:
     show_chart(pass_fail_chart(view), "No results to plot.")
+
+st.subheader("Semester comparison")
+st.caption(
+    "Pass rate uses Pass and Fail only. Incomplete students are left out. "
+    "The box plot shows how subject percentage spreads in each semester."
+)
+left, right = st.columns(2)
+with left:
+    show_chart(semester_pass_rate_chart(view), "No Pass or Fail results to compute a semester pass rate.")
+with right:
+    show_chart(
+        subject_percentage_box_by_semester(view),
+        "No subject percentages available to draw the semester box plot.",
+    )
+
+st.subheader("Grades and results by group")
+st.caption(
+    "The stacked bars show letter-grade mix per semester. "
+    "The sunburst drills from department to semester to Pass, Fail, or Incomplete."
+)
+left, right = st.columns(2)
+with left:
+    show_chart(grades_by_semester_stacked(view), "No letter grades available to stack by semester.")
+with right:
+    show_chart(
+        department_semester_result_sunburst(view),
+        "Need department, semester, and result status to draw the sunburst.",
+    )
+
+st.subheader("Top and bottom performers")
+st.caption(
+    "Highest and lowest subject percentages in the current filter. "
+    "Students without a subject percentage are left out."
+)
+show_chart(
+    top_bottom_subject_percentage_chart(view, limit=10),
+    "Need at least one subject percentage to draw the top and bottom list.",
+)
 
 st.subheader("Ranking")
 st.caption(
