@@ -35,6 +35,8 @@ class PredictionOutcome:
     baseline_r2: float | None
     comparison: pd.DataFrame | None
     features_used: list[str]
+    pipeline: object | None = None
+    baseline_value: float | None = None
 
 
 def regression_scores(y_true: object, y_pred: object) -> dict[str, float | None]:
@@ -139,6 +141,8 @@ def train_final_mark_model(df: pd.DataFrame, random_state: int = 42) -> Predicti
             "actual_final_marks": y_test.to_numpy(),
             "estimated_final_marks": linear_pred,
             "baseline_estimate": baseline_pred,
+            "residual": linear_pred - y_test.to_numpy(),
+            "absolute_error": np.abs(linear_pred - y_test.to_numpy()),
         }
     ).sort_values("student_id").reset_index(drop=True)
 
@@ -176,4 +180,25 @@ def train_final_mark_model(df: pd.DataFrame, random_state: int = 42) -> Predicti
         baseline_r2=baseline["r2"],
         comparison=comparison,
         features_used=features,
+        pipeline=pipeline,
+        baseline_value=baseline_value,
     )
+
+
+def estimate_final_marks(outcome: PredictionOutcome, feature_values: dict) -> float | None:
+    """Estimate one final mark from what-if inputs. Does not write to the database."""
+    pipeline = getattr(outcome, "pipeline", None)
+    if outcome is None or outcome.status != "ok" or pipeline is None:
+        return None
+    if not outcome.features_used:
+        return None
+    row = {}
+    for column in outcome.features_used:
+        value = feature_values.get(column)
+        if value is None or (isinstance(value, float) and np.isnan(value)):
+            row[column] = np.nan
+        else:
+            row[column] = float(value)
+    frame = pd.DataFrame([row], columns=outcome.features_used)
+    predicted = float(pipeline.predict(frame)[0])
+    return float(np.clip(predicted, 0.0, 100.0))

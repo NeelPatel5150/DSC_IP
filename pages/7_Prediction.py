@@ -12,13 +12,24 @@ if str(ROOT) not in sys.path:
 import pandas as pd
 import streamlit as st
 
-from modules.config import MIN_PREDICTION_ROWS, PREDICTION_FEATURES, PREDICTION_TARGET
-from modules.prediction import train_final_mark_model
+from modules.config import (
+    MIN_PREDICTION_ROWS,
+    PREDICTION_FEATURES,
+    PREDICTION_TARGET,
+    STUDY_HOURS_MAX,
+)
+from modules.prediction import estimate_final_marks, train_final_mark_model
 from modules.ui import banner, empty_state, loading, open_records, prepare_page, show_chart
 from modules.visualization import (
     prediction_actual_vs_estimated_scatter,
     prediction_residual_histogram,
 )
+
+
+def _feature_default(value: object, fallback: float) -> float:
+    if value is None or pd.isna(value):
+        return fallback
+    return float(value)
 
 settings = prepare_page()
 banner(
@@ -113,10 +124,25 @@ with right:
 st.subheader("Test-set estimates")
 st.caption(
     "Actual final marks are the stored examination values. "
-    "Estimated final marks come from the model and are not saved as results."
+    "Estimated final marks come from the model and are not saved as results. "
+    "Absolute error is |estimated − actual|. Smaller is better for that student."
 )
 show = outcome.comparison.copy()
-for column in ("actual_final_marks", "estimated_final_marks", "baseline_estimate"):
+if "absolute_error" not in show.columns:
+    show["absolute_error"] = (
+        show["estimated_final_marks"].astype(float) - show["actual_final_marks"].astype(float)
+    ).abs()
+show = show.loc[
+    :,
+    [
+        "student_id",
+        "student_name",
+        "actual_final_marks",
+        "estimated_final_marks",
+        "absolute_error",
+    ],
+]
+for column in ("actual_final_marks", "estimated_final_marks", "absolute_error"):
     show[column] = show[column].map(lambda value: round(float(value), 1))
 show = show.rename(
     columns={
@@ -124,7 +150,112 @@ show = show.rename(
         "student_name": "Student name",
         "actual_final_marks": "Actual final marks",
         "estimated_final_marks": "Estimated final marks",
-        "baseline_estimate": "Baseline estimate",
+        "absolute_error": "Absolute error",
     }
 )
 st.dataframe(show, width="stretch", hide_index=True)
+
+st.subheader("What-if for one student")
+if getattr(outcome, "pipeline", None) is None:
+    st.info("Train and evaluate again to unlock the what-if explorer for one student.")
+    st.stop()
+st.caption(
+    "Change the inputs below to see how the estimated final mark moves. "
+    "This does not change the stored examination marks and is not saved."
+)
+student_ids = performance["student_id"].tolist()
+selected_id = st.selectbox(
+    "Student",
+    student_ids,
+    format_func=lambda value: (
+        f"{value} — {performance.loc[performance['student_id'] == value, 'student_name'].iloc[0]}"
+    ),
+    key="whatif_student_id",
+)
+student = performance.loc[performance["student_id"] == selected_id].iloc[0]
+
+first, second, third = st.columns(3)
+with first:
+    attendance = st.number_input(
+        "Attendance %",
+        min_value=0.0,
+        max_value=100.0,
+        step=1.0,
+        value=_feature_default(student.get("attendance_percentage"), 75.0),
+        key=f"whatif_attendance_{selected_id}",
+    )
+    study_hours = st.number_input(
+        "Study hours per day",
+        min_value=0.0,
+        max_value=float(STUDY_HOURS_MAX),
+        step=0.5,
+        value=_feature_default(student.get("study_hours"), 3.0),
+        key=f"whatif_study_{selected_id}",
+    )
+with second:
+    mathematics = st.number_input(
+        "Mathematics / 100",
+        min_value=0.0,
+        max_value=100.0,
+        step=1.0,
+        value=_feature_default(student.get("mathematics_marks"), 50.0),
+        key=f"whatif_math_{selected_id}",
+    )
+    programming = st.number_input(
+        "Programming / 100",
+        min_value=0.0,
+        max_value=100.0,
+        step=1.0,
+        value=_feature_default(student.get("programming_marks"), 50.0),
+        key=f"whatif_prog_{selected_id}",
+    )
+with third:
+    database = st.number_input(
+        "Database / 100",
+        min_value=0.0,
+        max_value=100.0,
+        step=1.0,
+        value=_feature_default(student.get("database_marks"), 50.0),
+        key=f"whatif_db_{selected_id}",
+    )
+    internal = st.number_input(
+        "Internal / 50",
+        min_value=0.0,
+        max_value=50.0,
+        step=1.0,
+        value=_feature_default(student.get("internal_marks"), 25.0),
+        key=f"whatif_internal_{selected_id}",
+    )
+
+what_if_values = {
+    "attendance_percentage": attendance,
+    "study_hours": study_hours,
+    "mathematics_marks": mathematics,
+    "programming_marks": programming,
+    "database_marks": database,
+    "internal_marks": internal,
+}
+estimate = estimate_final_marks(outcome, what_if_values)
+stored_final = student.get(PREDICTION_TARGET)
+
+metric_left, metric_mid, metric_right = st.columns(3)
+with metric_left:
+    st.metric(
+        "Estimated final marks",
+        "—" if estimate is None else f"{estimate:.1f}",
+    )
+with metric_mid:
+    if stored_final is None or pd.isna(stored_final):
+        st.metric("Stored final marks", "Not recorded")
+    else:
+        st.metric("Stored final marks", f"{float(stored_final):.1f}")
+with metric_right:
+    baseline = getattr(outcome, "baseline_value", None)
+    st.metric(
+        "Baseline estimate",
+        "—" if baseline is None else f"{float(baseline):.1f}",
+    )
+st.caption(
+    "Estimated final marks use the trained linear model and the what-if inputs above. "
+    "Stored final marks stay as they are in the database."
+)

@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from modules.config import MIN_PREDICTION_ROWS, PREDICTION_FEATURES, PREDICTION_TARGET
-from modules.prediction import regression_scores, train_final_mark_model
+from modules.prediction import estimate_final_marks, regression_scores, train_final_mark_model
 
 
 def test_regression_scores_match_a_hand_calculation():
@@ -43,6 +43,45 @@ def test_model_metrics_are_finite_and_missing_targets_are_excluded():
     assert set(outcome.comparison["student_id"]).isdisjoint({"S000"})
     assert "estimated_final_marks" in outcome.comparison.columns
     assert "actual_final_marks" in outcome.comparison.columns
+    assert "absolute_error" in outcome.comparison.columns
+    assert (
+        outcome.comparison["absolute_error"]
+        == (outcome.comparison["estimated_final_marks"] - outcome.comparison["actual_final_marks"]).abs()
+    ).all()
+    assert outcome.pipeline is not None
+    assert outcome.baseline_value is not None
+
+
+def test_what_if_estimate_uses_the_trained_pipeline():
+    frame = _modeling_frame(MIN_PREDICTION_ROWS + 8)
+    outcome = train_final_mark_model(frame)
+    assert outcome.status == "ok"
+    low = estimate_final_marks(
+        outcome,
+        {
+            "attendance_percentage": 40,
+            "study_hours": 1,
+            "internal_marks": 10,
+            "mathematics_marks": 20,
+            "programming_marks": 20,
+            "database_marks": 20,
+        },
+    )
+    high = estimate_final_marks(
+        outcome,
+        {
+            "attendance_percentage": 98,
+            "study_hours": 8,
+            "internal_marks": 45,
+            "mathematics_marks": 95,
+            "programming_marks": 95,
+            "database_marks": 95,
+        },
+    )
+    assert low is not None and high is not None
+    assert 0 <= low <= 100
+    assert 0 <= high <= 100
+    assert high > low
 
 
 def _modeling_frame(rows: int) -> pd.DataFrame:
