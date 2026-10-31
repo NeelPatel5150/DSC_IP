@@ -17,8 +17,8 @@ from modules.visualization import (
     attendance_bands_chart,
     attendance_scatter,
     correlation_heatmap,
-    internal_final_scatter,
     study_hours_scatter,
+    subject_percentage_by_attendance_band_chart,
 )
 
 settings = prepare_page()
@@ -65,19 +65,18 @@ else:
     st.write(describe_correlation(study_r, study_n, "study hours", "subject percentage"))
     show_chart(study_hours_scatter(view), "Study hours and subject percentage need at least two complete pairs.")
 
-internal_available = view["internal_marks"].notna().any() if "internal_marks" in view.columns else False
-final_available = view["final_marks"].notna().any() if "final_marks" in view.columns else False
-if not internal_available or not final_available:
-    missing = []
-    if not internal_available:
-        missing.append("internal marks")
-    if not final_available:
-        missing.append("final marks")
-    st.info("The internal-versus-final chart is hidden because this view has no " + " or ".join(missing) + ".")
-else:
-    internal_r, internal_n = pearson(view, "internal_marks", "final_marks")
-    st.write(describe_correlation(internal_r, internal_n, "internal marks", "final marks"))
-    show_chart(internal_final_scatter(view), "Not enough paired internal and final marks to draw the chart.")
+st.subheader("Attendance bands and subject percentage")
+st.caption(
+    "Average subject percentage inside each attendance band. "
+    "This describes the filtered records only. It does not prove that attendance causes marks."
+)
+show_chart(
+    subject_percentage_by_attendance_band_chart(
+        view,
+        threshold=settings["attendance_threshold"],
+    ),
+    "Need attendance and subject percentage values to draw this bar chart.",
+)
 
 st.subheader("Correlation heatmap")
 show_chart(

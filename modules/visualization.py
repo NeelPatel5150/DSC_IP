@@ -322,6 +322,27 @@ def reason_chart(counts: pd.DataFrame):
     return fig
 
 
+def _attendance_band_order(threshold: float) -> list[str]:
+    low_cut = float(threshold)
+    mid_cut = 85.0
+    return [
+        f"Below {low_cut:.0f}%",
+        f"{low_cut:.0f}% to under {mid_cut:.0f}%",
+        f"{mid_cut:.0f}% and above",
+    ]
+
+
+def _attendance_band_label(value: float, threshold: float) -> str:
+    low_cut = float(threshold)
+    mid_cut = 85.0
+    number = float(value)
+    if number < low_cut:
+        return f"Below {low_cut:.0f}%"
+    if number < mid_cut:
+        return f"{low_cut:.0f}% to under {mid_cut:.0f}%"
+    return f"{mid_cut:.0f}% and above"
+
+
 def attendance_bands_chart(df: pd.DataFrame, threshold: float = ATTENDANCE_REVIEW_PERCENT):
     """Pie chart of attendance bands: below review threshold, mid, and high."""
     if df is None or df.empty or "attendance_percentage" not in df.columns:
@@ -329,28 +350,14 @@ def attendance_bands_chart(df: pd.DataFrame, threshold: float = ATTENDANCE_REVIE
     series = df["attendance_percentage"].dropna()
     if series.empty:
         return None
-    low_cut = float(threshold)
-    mid_cut = 85.0
-    bands = []
-    for value in series:
-        number = float(value)
-        if number < low_cut:
-            bands.append(f"Below {low_cut:.0f}%")
-        elif number < mid_cut:
-            bands.append(f"{low_cut:.0f}% to under {mid_cut:.0f}%")
-        else:
-            bands.append(f"{mid_cut:.0f}% and above")
+    bands = [_attendance_band_label(value, threshold) for value in series]
     counts = (
         pd.Series(bands)
         .value_counts()
         .rename_axis("band")
         .reset_index(name="students")
     )
-    order = [
-        f"Below {low_cut:.0f}%",
-        f"{low_cut:.0f}% to under {mid_cut:.0f}%",
-        f"{mid_cut:.0f}% and above",
-    ]
+    order = _attendance_band_order(threshold)
     counts["band"] = pd.Categorical(counts["band"], categories=order, ordered=True)
     counts = counts.sort_values("band")
     counts["label"] = counts["band"].astype(str) + " · " + counts["students"].astype(str)
@@ -376,6 +383,58 @@ def attendance_bands_chart(df: pd.DataFrame, threshold: float = ATTENDANCE_REVIE
         height=400,
     )
     return fig
+
+
+def subject_percentage_by_attendance_band_chart(
+    df: pd.DataFrame,
+    threshold: float = ATTENDANCE_REVIEW_PERCENT,
+):
+    """Bar chart of mean subject percentage inside each attendance band."""
+    if df is None or df.empty:
+        return None
+    needed = {"attendance_percentage", "subject_percentage"}
+    if not needed.issubset(df.columns):
+        return None
+    chart = df.dropna(subset=["attendance_percentage", "subject_percentage"]).copy()
+    if chart.empty:
+        return None
+    chart["band"] = chart["attendance_percentage"].map(
+        lambda value: _attendance_band_label(value, threshold)
+    )
+    order = _attendance_band_order(threshold)
+    summary = (
+        chart.groupby("band", observed=False)
+        .agg(average_subject_percent=("subject_percentage", "mean"), students=("subject_percentage", "size"))
+        .reset_index()
+    )
+    summary["band"] = pd.Categorical(summary["band"], categories=order, ordered=True)
+    summary = summary.sort_values("band")
+    if summary.empty:
+        return None
+    colors = {
+        order[0]: "#B23A48",
+        order[1]: "#C47B17",
+        order[2]: "#1E7F4F",
+    }
+    fig = px.bar(
+        summary,
+        x="band",
+        y="average_subject_percent",
+        text=summary["average_subject_percent"].map(lambda value: f"{value:.1f}%"),
+        custom_data=["students"],
+        color="band",
+        color_discrete_map=colors,
+        title="Average subject % by attendance band",
+        labels={"band": "Attendance band", "average_subject_percent": "Average subject %"},
+    )
+    fig.update_traces(
+        hovertemplate=(
+            "%{x}<br>Average subject %: %{y:.1f}"
+            "<br>Students: %{customdata[0]}<extra></extra>"
+        ),
+    )
+    fig.update_layout(showlegend=False, yaxis_range=[0, 100])
+    return _finish(fig)
 
 
 def department_semester_result_sunburst(df: pd.DataFrame):
